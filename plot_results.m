@@ -1,45 +1,69 @@
 function plot_results(results, K, mode)
-    fprintf('=== K=%d, %s ===\n', K, mode);
+    % plot_results: 輸出解析公式與蒙地卡羅模擬的對照表格與圖形
     
-    if K == 6
-        % Labels for Set 1 and Set 2 based on spec
-        labels1 = {'s0', 's2', 's3', 's4', 's5', 's7', 'Avg'};
-        labels2 = {'s1', 's2', 's3', 's4', 's5', 's6', 'Avg'};
-        
-        % Print header
-        fprintf('         s0      s2      s3      s4      s5      s7    Avg\n');
-        
-        vals1 = results.set1;
-        avg1 = mean(vals1);
-        fprintf('Set 1:  %.3f   %.3f   %.3f   %.3f   %.3f   %.3f  %.3f\n', vals1(1), vals1(2), vals1(3), vals1(4), vals1(5), vals1(6), avg1);
-        
-        fprintf('         s1      s2      s3      s4      s5      s6    Avg\n');
-        vals2 = results.set2;
-        avg2 = mean(vals2);
-        fprintf('Set 2:  %.3f   %.3f   %.3f   %.3f   %.3f   %.3f  %.3f\n', vals2(1), vals2(2), vals2(3), vals2(4), vals2(5), vals2(6), avg2);
-        
-        % Plotting
-        figure;
-        bar([vals1', vals2']);
-        title(sprintf('K=%d AAoI Comparison (%s)', K, mode));
-        xlabel('User index in Set');
-        ylabel('AAoI');
-        legend('Set 1', 'Set 2');
-        grid on;
-    else
-        % For K=5
-        fprintf('         seq1    seq2    seq3    seq4    seq5    Avg\n');
-        vals1 = results.set1;
-        avg1 = mean(vals1);
-        fprintf('Set 1:  %.3f   %.3f   %.3f   %.3f   %.3f  %.3f\n', vals1(1), vals1(2), vals1(3), vals1(4), vals1(5), avg1);
-        
-        figure;
-        bar(vals1');
-        title(sprintf('K=%d AAoI Comparison (%s)', K, mode));
-        xlabel('User index in Set');
-        ylabel('AAoI');
-        legend('Set 1');
-        grid on;
+    fprintf('=== K=%d, %s, Set %d ===\n', K, mode, results.set_id);
+    
+    U = length(results.analytical);
+    seq_names = results.seq_names;
+    
+    % 印出對齊的 Header
+    fprintf('        ');
+    for i = 1:U
+        fprintf(' %-6s', seq_names{i});
     end
-    fprintf('\n');
+    fprintf('  Avg\n');
+    
+    % 取出數值並計算平均
+    an_vals = results.analytical;
+    mc_vals = results.mc;
+    an_avg = mean(an_vals);
+    mc_avg = mean(mc_vals);
+    diff_vals = abs(an_vals - mc_vals);
+    diff_avg = abs(an_avg - mc_avg);
+    
+    % 印出 Analytical Row
+    fprintf('Analyt: ');
+    for i = 1:U
+        fprintf(' %-6.3f', an_vals(i));
+    end
+    fprintf('  %.3f\n', an_avg);
+    
+    % 印出 Monte Carlo Row
+    fprintf('MC:     ');
+    for i = 1:U
+        fprintf(' %-6.3f', mc_vals(i));
+    end
+    fprintf('  %.3f\n', mc_avg);
+    
+    % 印出 Diff Row
+    fprintf('Diff:   ');
+    for i = 1:U
+        fprintf(' %-6.3f', diff_vals(i));
+    end
+    fprintf('  %.3f\n\n', diff_avg);
+    
+    %% 繪製對照圖 (Analytical vs MC)
+    figure;
+    hold on;
+    
+    % x 軸為 1 到 U
+    x = 1:U;
+    
+    % 畫 Analytial: 實線 + 正方形 marker
+    plot(x, an_vals, '-s', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Analytical');
+    
+    % 畫 Monte Carlo: 虛線 + 圓形 marker
+    plot(x, mc_vals, '--o', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Monte Carlo');
+    
+    title(sprintf('K=%d, Set %d AAoI (%s)', K, results.set_id, mode));
+    
+    % 設定 X 軸的 labels 為序列名稱
+    xticks(x);
+    xticklabels(seq_names);
+    xlabel('User (Sequence)');
+    ylabel('AAoI');
+    
+    legend('Location', 'best');
+    grid on;
+    hold off;
 end
