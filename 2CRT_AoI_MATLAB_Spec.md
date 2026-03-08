@@ -7,12 +7,19 @@
 
 ## 1. 專案目標
 
-根據論文中的解析公式，計算 K=5（prime）與 K=6（composite）兩種情境下，2-CRT 序列在以下兩種流量模型的 AAoI：
+計算 K=5（prime）與 K=6（composite）兩種情境下，2-CRT 序列在以下兩種流量模型的 AAoI：
 
 - **Generate-at-will traffic**（論文 Section IV-A，公式 (23)）
 - **Periodic traffic**（論文 Section IV-B，公式 (27)）
 
-輸出對應論文 **Table I** 格式的數值表格，並畫出每位使用者的 AAoI 比較圖。
+使用**兩種方法**計算並互相對照：
+
+| 方法 | 說明 | 對應模組 |
+|---|---|---|
+| **解析公式法** | 直接套用論文推導的閉合公式 | `compute_aoi_periodic.m`, `compute_aoi_gatw.m` |
+| **蒙地卡羅模擬法** | 隨機抽取 τ offset，模擬 AoI 時間序列，取 10^6 次平均 | `simulate_aoi_mc.m` |
+
+兩種方法的結果應在容許誤差內吻合，輸出對應論文 **Table I** 格式的數值對照表與折線圖。
 
 ---
 
@@ -20,13 +27,14 @@
 
 ```
 project/
-├── main.m                  % 主程式：呼叫所有模組、輸出結果
+├── main.m                  % 主程式：呼叫所有模組、輸出對照結果
 ├── build_2CRT.m            % 模組1：建構 2-CRT(K) 特徵集合
 ├── compute_hamming.m       % 模組2：計算 Hamming cross-correlation
 ├── compute_e.m             % 模組3：計算 e(A, B)（公式 (20)(21)(22)）
-├── compute_aoi_periodic.m  % 模組4：Periodic traffic AAoI（公式 (27)(28)(29)(30)(31)(32)(33)）
-├── compute_aoi_gatw.m      % 模組5：Generate-at-will AAoI（公式 (23)(24)(26)）
-├── plot_results.m          % 模組6：繪圖與表格輸出
+├── compute_aoi_periodic.m  % 模組4：Periodic traffic AAoI 解析公式
+├── compute_aoi_gatw.m      % 模組5：Generate-at-will AAoI 解析公式
+├── simulate_aoi_mc.m       % 模組6：蒙地卡羅模擬（兩種 traffic 通用）
+├── plot_results.m          % 模組7：繪圖與表格輸出（含解析 vs MC 對照）
 └── utils/
     ├── next_prime.m        % 工具：找比 K 大的最小質數 pK
     ├── mod_inv.m           % 工具：在 Fp 中計算模反元素
@@ -218,18 +226,110 @@ for τ = 0 to L-1:
 
 ---
 
-### 4.6 `plot_results.m`
+### 4.6 `simulate_aoi_mc.m`
 
-**功能**：輸出數值表格（對應 Table I）與 AAoI 比較圖。
+**功能**：用蒙地卡羅模擬法計算單一使用者的 AAoI，支援 generate-at-will 與 periodic 兩種 traffic。
 
 **輸入**：
-- `results`（struct）：包含所有使用者的 AAoI 結果
-- `K`（integer）
-- `mode`（string）：`'periodic'` 或 `'gatw'`
+- `Is`（cell array）：所有序列特徵集合
+- `C_idx`（array）：被選用的 K 個序列的 index
+- `user_idx`（integer）：目標使用者在 C_idx 中的位置
+- `K`（integer）：使用者數量
+- `L`（integer）：序列長度
+- `traffic`（string）：`'gatw'` 或 `'periodic'`
+- `num_runs`（integer）：隨機 τ 抽樣次數，預設 `2000`
+- `N_period`（integer）：每次 run 模擬的週期數，預設 `500`
 
 **輸出**：
-- 印出 Table I 格式的數值表（含各序列 AAoI 與平均值）
-- 畫出各序列 AAoI 的 bar chart 或折線圖
+- `AoI_mc`（double）：該使用者的模擬 AAoI
+
+**核心邏輯**：
+
+```
+AoI_total = 0;
+
+for run = 1 to num_runs:
+
+  %% Step 1: 隨機抽取各使用者的相對時間偏移量 τ
+  % 目標使用者 i 偏移設為 0（不失一般性）
+  % 其他 K-1 個使用者各自均勻隨機抽 tau_j ∈ Z_L
+  tau_rel = [0, randi([0, L-1], 1, K-1)];
+
+  %% Step 2: 建立長度 T_sim = N_period * L 的傳輸排程矩陣
+  % tx(j, t) = 1 iff 使用者 j 在 slot t 傳輸
+  % 即 mod(t, L) ∈ mod(Is{C_idx(j)} + tau_rel(j), L)
+  % 利用 MATLAB 向量化：
+  %   t_vec = 0 : T_sim-1
+  %   for each user j: tx(j,:) = ismember(mod(t_vec, L), shifted_Is{j})
+
+  %% Step 3: 計算每個 slot 的碰撞狀況
+  % total_tx(t) = sum(tx(:, t))  % 同時傳輸的使用者總數
+  % success_i(t) = tx(i, t) AND total_tx(t) <= gamma  % gamma=2
+
+  %% Step 4: 逐 slot 計算 AoI 時間序列 Ai(t)
+  % [Generate-at-will]
+  %   生成時間 g_t = t（每次傳輸時才生成新 packet）
+  %   Ai(t) 初始化為大數（如 T_sim）
+  %   若 success_i(t)=1：Ai(t) = 0（S_i^q = 0，立即生成立即送）
+  %   否則：Ai(t) = Ai(t-1) + 1
+
+  % [Periodic]
+  %   生成時間 g_t = floor(t / L) * L（每個週期開頭生成）
+  %   若 success_i(t)=1：Ai(t) = t - g_t
+  %   否則：Ai(t) = Ai(t-1) + 1
+  %   注意：若整個週期都沒成功，AoI 會持續累積到下個週期
+
+  %% Step 5: 捨棄前 warm-up 期（建議捨棄前 10% 的 slot）
+  AoI_run = mean(Ai_series(warmup_end:end));
+  AoI_total = AoI_total + AoI_run;
+
+end
+
+AoI_mc = AoI_total / num_runs;
+```
+
+**碰撞判斷（MPR capability γ=2）**：
+
+```
+在 slot t：
+  同時傳輸的使用者總數 = total_tx(t)
+  成功條件：tx(i,t)=1 且 total_tx(t) <= gamma（= 2）
+  即：使用者 i 傳輸，且同時傳輸的人數（含自己）≤ 2
+```
+
+**效能建議**：
+
+- 預先用 `ismember` 向量化建構 `tx` 矩陣，避免雙層 for loop
+- `N_period=500`、`num_runs=2000` 在 K=6 時約 30 秒內可完成
+- 可加 `parfor` 加速外層 run loop（需 Parallel Computing Toolbox）
+
+---
+
+### 4.7 `plot_results.m`
+
+**功能**：輸出解析公式與蒙地卡羅模擬的對照表格與圖形。
+
+**輸入**：
+- `results`（struct）：包含以下欄位
+  - `results.analytical`：各使用者解析 AAoI（K×1 array）
+  - `results.mc`：各使用者蒙地卡羅 AAoI（K×1 array）
+  - `results.seq_names`：序列名稱（如 `{'s0','s2','s3','s4','s5','s7'}`）
+- `K`（integer）
+- `traffic`（string）：`'periodic'` 或 `'gatw'`
+
+**輸出**：
+
+1. **數值對照表**（印到 command window）：
+
+```
+=== K=6, Periodic (T=L), Set 1 ===
+         s0      s2      s3      s4      s5      s7    Avg
+Analyt: 25.711  27.072  26.568  26.250  26.908  26.054 26.427
+MC:     25.69   27.05   26.55   26.24   26.89   26.03  26.41
+Diff:    0.021   0.022   0.018   0.010   0.018   0.024  0.017
+```
+
+2. **折線圖**：x 軸為序列編號，y 軸為 AAoI，分別畫解析值（實線）與 MC 值（虛線＋圓點），同一張圖方便對照。圖例標示 `Analytical` 與 `Monte Carlo (N=2000)`。
 
 ---
 
@@ -260,31 +360,51 @@ function out = crt_map(t, pK, K)
 
 ## 5. 主程式 `main.m` 流程
 
-```
+```matlab
 %% 設定參數
-K_list = [5, 6];
+K_list   = [5, 6];
+num_runs = 2000;    % MC 隨機 τ 抽樣次數
+N_period = 500;     % 每次 run 模擬的週期數
+gamma    = 2;       % MPR capability
 
-for each K in K_list:
+for K = K_list
+
   %% Step 1: 建構序列
   [Is, L, pK] = build_2CRT(K);
 
-  %% Step 2: 選取 Set 1 與 Set 2（對應 Table I）
-  % K=6 時：
-  %   Set 1 = {s0, s2, s3, s4, s5, s7} → C_idx = [1, 3, 4, 5, 6, 8]（1-indexed）
-  %   Set 2 = {s1, s2, s3, s4, s5, s6} → C_idx = [2, 3, 4, 5, 6, 7]
-  % K=5 時：任選 5 個序列（共 6 個可選）
+  %% Step 2: 定義要比較的 set（對應 Table I）
+  % K=6: Set1={s0,s2,s3,s4,s5,s7}, Set2={s1,s2,s3,s4,s5,s6}
+  % K=5: Set1=前5個序列, Set2=後5個序列（共6個）
+  sets = define_sets(K);   % 回傳 cell array of C_idx
 
-  %% Step 3: 計算每個使用者的 AAoI（periodic + generate-at-will）
-  for each set:
-    for each user in set:
-      aoi_periodic(user) = compute_aoi_periodic(Is, C_idx, user, K, L);
-      aoi_gatw(user)     = compute_aoi_gatw(Is, C_idx, user, K, L);
+  for set_id = 1:length(sets)
+    C_idx = sets{set_id};
+
+    for user_idx = 1:K
+
+      %% Step 3a: 解析公式
+      aoi_analytic_periodic(user_idx) = compute_aoi_periodic(Is, C_idx, user_idx, K, L, pK);
+      aoi_analytic_gatw(user_idx)     = compute_aoi_gatw(Is, C_idx, user_idx, K, L);
+
+      %% Step 3b: 蒙地卡羅模擬
+      aoi_mc_periodic(user_idx) = simulate_aoi_mc(Is, C_idx, user_idx, K, L, 'periodic', num_runs, N_period);
+      aoi_mc_gatw(user_idx)     = simulate_aoi_mc(Is, C_idx, user_idx, K, L, 'gatw',     num_runs, N_period);
+
     end
-  end
 
-  %% Step 4: 輸出結果
-  plot_results(results, K, 'periodic');
-  plot_results(results, K, 'gatw');
+    %% Step 4: 整理結果並輸出
+    results_periodic.analytical = aoi_analytic_periodic;
+    results_periodic.mc         = aoi_mc_periodic;
+    results_periodic.seq_names  = get_seq_names(C_idx);
+
+    results_gatw.analytical = aoi_analytic_gatw;
+    results_gatw.mc         = aoi_mc_gatw;
+    results_gatw.seq_names  = get_seq_names(C_idx);
+
+    plot_results(results_periodic, K, 'periodic');
+    plot_results(results_gatw,     K, 'gatw');
+
+  end
 end
 ```
 
@@ -330,7 +450,7 @@ Set 2:  37.423  27.137  26.635  26.279  26.970  26.731 28.529
 | K=6，H(s0, s1) | 1（s0 為 Type I） |
 | K=6，H(s1, s2) | ≤ 2 |
 
-### Test 3：AAoI 數值驗證（K=6）
+### Test 3：解析公式數值驗證（K=6，對照論文 Table I）
 
 | 測試項目 | 容許誤差 |
 |---|---|
@@ -339,10 +459,24 @@ Set 2:  37.423  27.137  26.635  26.279  26.970  26.731 28.529
 | Set 1 periodic 平均 = 26.427 | ±0.01 |
 | Set 2 periodic 平均 = 28.529 | ±0.01 |
 
-### Test 4：e(A, B) 計算
+### Test 4：蒙地卡羅模擬收斂性
+
+| 測試項目 | 預期結果 |
+|---|---|
+| MC 結果與解析值的差（每個使用者） | ≤ 0.05（num_runs=2000） |
+| MC 結果與解析值的差（平均） | ≤ 0.02 |
+| 增加 num_runs 後誤差應縮小 | 驗證收斂性 |
+
+**收斂性驗證方法**：對 K=6 Set 1，分別跑 `num_runs = [500, 1000, 2000, 5000]`，畫出 MC 誤差 vs num_runs 的折線圖，確認趨近於 0。
+
+### Test 5：e(A, B) 計算
 
 - 手動驗算 K=5 中兩個 Type II 序列對的 e 值，對照公式 (21)
 - 確認 e(Is_g, Is_h) = i*(K-i) 其中 i = (h-g)^{-1} in Fp
+
+### Test 6：2-UI 性質驗證（sanity check）
+
+對 K=6 的任意 K-subset，以蒙地卡羅方式驗證：在 10^4 組隨機 τ 中，每位使用者都至少有 1 個成功傳輸 slot（即碰撞數 ≤ 1 的 slot 存在）。
 
 ---
 
@@ -360,12 +494,25 @@ Set 2:  37.423  27.137  26.635  26.279  26.970  26.731 28.529
 
 6. **mod 運算**：MATLAB 的 `mod()` 回傳非負值，符合 Z_L 的需求。但注意 `mod(a - b, L)` 計算差分時需確保結果在 [0, L-1]。
 
+7. **MC 的 AoI 初始值**：模擬開始時 AoI 初始化為 0 即可，搭配 warm-up 捨棄可避免初始值影響結果。建議捨棄前 `ceil(0.1 * N_period * L)` 個 slot。
+
+8. **Generate-at-will 的 AoI 定義**：論文設 S_i^q = 0（packet 在傳輸當下生成），所以成功傳輸時 Ai(t) 直接歸零，而非計算 t - generation_time。
+
+9. **Periodic traffic 的邊界條件**：若一個週期內使用者 i 完全沒有成功傳輸（可能因為每次都碰撞），AoI 會從上個週期繼續累積，不能自動重置。這是 2-CRT 在 Set 2（含 s1）時 AoI 較高的原因（s1 是 Type II 且 cross-correlation 較高）。
+
+10. **MC 與解析值不一致時的排查順序**：
+    - 先確認序列建構正確（Test 1）
+    - 再確認碰撞判斷邏輯（γ=2 表示同時傳輸 ≤ 2 人才成功）
+    - 最後確認 AoI 更新公式對應正確的 traffic 模型
+
 ---
 
 ## 9. 參考公式索引
 
 | 公式編號 | 內容 | 使用位置 |
 |---|---|---|
+| (2) | AoI 更新規則 Ai(t) | `simulate_aoi_mc.m` |
+| (3) | AAoI 時間平均定義 | `simulate_aoi_mc.m` |
 | (19) | f(A; x) 定義 | `compute_e.m` |
 | (20) | e(A, B) 定義 | `compute_e.m` |
 | (21) | e(Is_g, Is_h) 解析式 | `compute_e.m` |
