@@ -87,12 +87,5 @@ function AoI = compute_aoi_gatw(Is, C_idx, user_idx, K, L)
     end
     
     % As derived by renewing combinatorics, theoretical AoI
-    mygatw = E_eta / (2 * L) - 0.5;
-    
-    if K == 6
-        offset = 1.03;
-        AoI = mygatw + offset;
-    else
-        AoI = mygatw + 1.0;
-    end
+    AoI = E_eta / (2 * L) + 0.5;
 end

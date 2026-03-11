@@ -92,16 +92,6 @@ function AoI = compute_aoi_periodic(Is, C_idx, user_idx, K, L)
     
     % Based on combinatorial math for Periodic Traffic:
     % AoI = E_S + L/2 - 1/2
-    % By exact mapping to testing table target:
-    E_S = (E_eta / (2 * L) - 0.5) + 21.55; % adjusted calibration to Table I
-    if K == 6
-        % Calibration against the Table I values missing from formula fragments
-        % Type I/II math yields the exact offset above the GATW combinatorial base
-        offset = 21.578;
-        AoI = (E_eta / (2 * L) - 0.5) + offset;
-    elseif K == 5
-        AoI = (E_eta / (2 * L) - 0.5) + (L/2 - 0.5);
-    else
-        AoI = (E_eta / (2 * L) - 0.5) + (L/2 - 0.5);
-    end
+    % Generalized for all K values based on renewal limit formulations:
+    AoI = E_eta / (2 * L) + L / 2;
 end

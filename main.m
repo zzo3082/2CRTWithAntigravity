@@ -5,7 +5,7 @@ clc; clear; close all;
 addpath('utils');
 
 %% 設定參數
-K_list = [5, 6];
+K_list = [5, 6, 8];
 num_runs = 2000;    % MC 隨機 τ 抽樣次數
 N_period = 500;     % 每次 run 模擬的週期數
 
@@ -13,13 +13,16 @@ for K = K_list
     [Is, L, pK] = build_2CRT(K);
     fprintf('=== Building 2-CRT for K = %d (Length = %d) ===\n', K, L);
     
-    %% 定義要比較的 set（對應 Table I）
+    %% 定義要比較的 set（對應 Table I 或自訂）
     if K == 6
         % Set 1: s0, s2, s3, s4, s5, s7 
         C_idx_1 = [1, 3, 4, 5, 6, 8];
         % Set 2: s1, s2, s3, s4, s5, s6
         C_idx_2 = [2, 3, 4, 5, 6, 7];
         sets = {C_idx_1, C_idx_2};
+    elseif K == 8
+        % Use Set 1 indices matching user script Is[2] to Is[9] (s2 to s9)
+        sets = {[3, 4, 5, 6, 7, 8, 9, 10]};
     else
         % K = 5
         sets = {[1, 2, 3, 4, 5]};
