@@ -5,7 +5,7 @@ clc; clear; close all;
 addpath('utils');
 
 %% 設定參數
-K_list = [5, 6, 8];
+K_list = [9];
 num_runs = 2000;    % MC 隨機 τ 抽樣次數
 N_period = 500;     % 每次 run 模擬的週期數
 
@@ -16,16 +16,16 @@ for K = K_list
     %% 定義要比較的 set（對應 Table I 或自訂）
     if K == 6
         % Set 1: s0, s2, s3, s4, s5, s7 
-        C_idx_1 = [1, 3, 4, 5, 6, 8];
+        C_idx_1 = [1, 3, 4, 5, 6, 7];
         % Set 2: s1, s2, s3, s4, s5, s6
-        C_idx_2 = [2, 3, 4, 5, 6, 7];
+        C_idx_2 = [1, 3, 4, 5, 6, 7];
         sets = {C_idx_1, C_idx_2};
     elseif K == 8
         % Use Set 1 indices matching user script Is[2] to Is[9] (s2 to s9)
         sets = {[3, 4, 5, 6, 7, 8, 9, 10]};
     else
         % K = 5
-        sets = {[1, 2, 3, 4, 5]};
+        sets = {[3, 4, 5, 6, 7, 8, 9, 10, 11]};
     end
     
     for set_id = 1:length(sets)
@@ -42,9 +42,9 @@ for K = K_list
             aoi_analytic_periodic(user_idx) = compute_aoi_periodic(Is, C_idx, user_idx, K, L);
             aoi_analytic_gatw(user_idx) = compute_aoi_gatw(Is, C_idx, user_idx, K, L);
             
-            %% MC 模擬計算
-            aoi_mc_periodic(user_idx) = simulate_aoi_mc(Is, C_idx, user_idx, K, L, 'periodic', num_runs, N_period);
-            aoi_mc_gatw(user_idx) = simulate_aoi_mc(Is, C_idx, user_idx, K, L, 'gatw', num_runs, N_period);
+            % %% MC 模擬計算
+            % aoi_mc_periodic(user_idx) = simulate_aoi_mc(Is, C_idx, user_idx, K, L, 'periodic', num_runs, N_period);
+            % aoi_mc_gatw(user_idx) = simulate_aoi_mc(Is, C_idx, user_idx, K, L, 'gatw', num_runs, N_period);
             
             fprintf('Set %d User %d done.\n', set_id, user_idx);
         end
