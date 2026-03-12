@@ -28,19 +28,19 @@ function plot_results(results, K, mode)
     end
     fprintf('  %.3f\n', an_avg);
     
-    % 印出 Monte Carlo Row
-    fprintf('MC:     ');
-    for i = 1:U
-        fprintf(' %-6.3f', mc_vals(i));
-    end
-    fprintf('  %.3f\n', mc_avg);
+    % % 印出 Monte Carlo Row
+    % fprintf('MC:     ');
+    % for i = 1:U
+    %     fprintf(' %-6.3f', mc_vals(i));
+    % end
+    % fprintf('  %.3f\n', mc_avg);
     
-    % 印出 Diff Row
-    fprintf('Diff:   ');
-    for i = 1:U
-        fprintf(' %-6.3f', diff_vals(i));
-    end
-    fprintf('  %.3f\n\n', diff_avg);
+    % % 印出 Diff Row
+    % fprintf('Diff:   ');
+    % for i = 1:U
+    %     fprintf(' %-6.3f', diff_vals(i));
+    % end
+    % fprintf('  %.3f\n\n', diff_avg);
     
     %% 繪製對照圖 (Analytical vs MC)
     figure;
