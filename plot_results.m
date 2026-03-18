@@ -15,11 +15,11 @@ function plot_results(results, K, mode)
     
     % 取出數值並計算平均
     an_vals = results.analytical;
-    mc_vals = results.mc;
+    % mc_vals = results.mc;
     an_avg = mean(an_vals);
-    mc_avg = mean(mc_vals);
-    diff_vals = abs(an_vals - mc_vals);
-    diff_avg = abs(an_avg - mc_avg);
+    % mc_avg = mean(mc_vals);
+    % diff_vals = abs(an_vals - mc_vals);
+    % diff_avg = abs(an_avg - mc_avg);
     
     % 印出 Analytical Row
     fprintf('Analyt: ');
@@ -42,28 +42,28 @@ function plot_results(results, K, mode)
     % end
     % fprintf('  %.3f\n\n', diff_avg);
     
-    %% 繪製對照圖 (Analytical vs MC)
-    figure;
-    hold on;
-    
-    % x 軸為 1 到 U
-    x = 1:U;
-    
-    % 畫 Analytial: 實線 + 正方形 marker
-    plot(x, an_vals, '-s', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Analytical');
-    
-    % 畫 Monte Carlo: 虛線 + 圓形 marker
-    plot(x, mc_vals, '--o', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Monte Carlo');
-    
-    title(sprintf('K=%d, Set %d AAoI (%s)', K, results.set_id, mode));
-    
-    % 設定 X 軸的 labels 為序列名稱
-    xticks(x);
-    xticklabels(seq_names);
-    xlabel('User (Sequence)');
-    ylabel('AAoI');
-    
-    legend('Location', 'best');
-    grid on;
-    hold off;
+    % %% 繪製對照圖 (Analytical vs MC)
+    % figure;
+    % hold on;
+    % 
+    % % x 軸為 1 到 U
+    % x = 1:U;
+    % 
+    % % 畫 Analytial: 實線 + 正方形 marker
+    % plot(x, an_vals, '-s', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Analytical');
+    % 
+    % % 畫 Monte Carlo: 虛線 + 圓形 marker
+    % plot(x, mc_vals, '--o', 'LineWidth', 2, 'MarkerSize', 8, 'DisplayName', 'Monte Carlo');
+    % 
+    % title(sprintf('K=%d, Set %d AAoI (%s)', K, results.set_id, mode));
+    % 
+    % % 設定 X 軸的 labels 為序列名稱
+    % xticks(x);
+    % xticklabels(seq_names);
+    % xlabel('User (Sequence)');
+    % ylabel('AAoI');
+    % 
+    % legend('Location', 'best');
+    % grid on;
+    % hold off;
 end

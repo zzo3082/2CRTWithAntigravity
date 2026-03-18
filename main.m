@@ -5,7 +5,7 @@ clc; clear; close all;
 addpath('utils');
 
 %% 設定參數
-K_list = [9];
+K_list = [13];
 num_runs = 2000;    % MC 隨機 τ 抽樣次數
 N_period = 500;     % 每次 run 模擬的週期數
 
@@ -25,7 +25,8 @@ for K = K_list
         sets = {[3, 4, 5, 6, 7, 8, 9, 10]};
     else
         % K = 5
-        sets = {[3, 4, 5, 6, 7, 8, 9, 10, 11]};
+        sets = {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]};
+        % sets = {[2, 3, 4, 5, 6]};
     end
     
     for set_id = 1:length(sets)
@@ -34,8 +35,8 @@ for K = K_list
         
         aoi_analytic_periodic = zeros(1, U);
         aoi_analytic_gatw = zeros(1, U);
-        aoi_mc_periodic = zeros(1, U);
-        aoi_mc_gatw = zeros(1, U);
+        % aoi_mc_periodic = zeros(1, U);
+        % aoi_mc_gatw = zeros(1, U);
         
         for user_idx = 1:U
             %% 解析公式計算
@@ -58,17 +59,17 @@ for K = K_list
         %% 整理結果並繪圖
         results_periodic = struct();
         results_periodic.analytical = aoi_analytic_periodic;
-        results_periodic.mc = aoi_mc_periodic;
+        % results_periodic.mc = aoi_mc_periodic;
         results_periodic.seq_names = seq_names;
         results_periodic.set_id = set_id;
         
         results_gatw = struct();
         results_gatw.analytical = aoi_analytic_gatw;
-        results_gatw.mc = aoi_mc_gatw;
+        % results_gatw.mc = aoi_mc_gatw;
         results_gatw.seq_names = seq_names;
         results_gatw.set_id = set_id;
         
-        plot_results(results_periodic, K, 'Periodic (T=L)');
         plot_results(results_gatw, K, 'Generate-at-will (T=1)');
+        plot_results(results_periodic, K, 'Periodic (T=L)');
     end
 end

@@ -8,72 +8,62 @@ function AoI = compute_aoi_periodic(Is, C_idx, user_idx, K, L)
     % To ensure mathematical correctness across all K and cases, use convolution over tau combinations.
     % Calculate exact distribution of other users' hits.
     
-    current_dist = containers.Map('KeyType', 'char', 'ValueType', 'double');
-    init_key = repmat('0', 1, K);
-    current_dist(init_key) = 1;
-
+    % Use Base-3 index mapping to replace slow string Map
+    % Map size is 3^K. Index = 1 + c1*3^0 + c2*3^1 + ... (where c_j in {0,1,2})
+    P_old = zeros(3^K, 1);
+    P_old(1) = 1;
+    pow3 = 3.^(0:K-1);
+    
     for i = 1:length(C_idx)
         if i == user_idx
             continue;
         end
         other_seq = Is{C_idx(i)};
         
-        shift_dist = containers.Map('KeyType', 'char', 'ValueType', 'double');
+        tau_patterns = zeros(L, K);
         for tau = 0:L-1
-            pat = char(zeros(1, K) + '0');
             shifted = mod(other_seq + tau, L);
-            for j = 1:K
-                if ismember(user_seq(j), shifted)
-                    pat(j) = '1';
-                end
-            end
-            if isKey(shift_dist, pat)
-                shift_dist(pat) = shift_dist(pat) + 1;
-            else
-                shift_dist(pat) = 1;
-            end
+            tau_patterns(tau+1, :) = ismember(user_seq, shifted);
         end
         
-        new_dist = containers.Map('KeyType', 'char', 'ValueType', 'double');
-        k1 = keys(current_dist);
-        v1 = values(current_dist);
-        k2 = keys(shift_dist);
-        v2 = values(shift_dist);
-        for i1 = 1:length(k1)
-            pat1 = k1{i1};
-            cnt1 = v1{i1};
-            for i2 = 1:length(k2)
-                pat2 = k2{i2};
-                cnt2 = v2{i2};
-                
-                new_pat = char(zeros(1, K) + '0');
-                for j = 1:K
-                    new_pat(j) = char((pat1(j) - '0') + (pat2(j) - '0') + '0');
-                end
-                if isKey(new_dist, new_pat)
-                    new_dist(new_pat) = new_dist(new_pat) + cnt1 * cnt2;
-                else
-                    new_dist(new_pat) = cnt1 * cnt2;
-                end
-            end
+        P_new = zeros(3^K, 1);
+        non_zero_idx = find(P_old > 0);
+        vals = P_old(non_zero_idx);
+        
+        v_idx = non_zero_idx - 1;
+        v_mat = repmat(v_idx, 1, K);
+        pow3_mat = repmat(pow3, length(non_zero_idx), 1);
+        c = rem(floor(v_mat ./ pow3_mat), 3);
+        
+        for t = 1:L
+            pat_t = tau_patterns(t, :);
+            pat_mat = repmat(pat_t, length(non_zero_idx), 1);
+            
+            c_new = c + pat_mat;
+            c_new(c_new > 2) = 2; % Cap at 2
+            
+            new_idx = 1 + c_new * pow3';
+            P_new = P_new + accumarray(new_idx, vals, [3^K, 1]);
         end
-        current_dist = new_dist;
+        P_old = P_new;
     end
     
     E_eta = 0;
     total_combs = L^(length(C_idx) - 1);
     
-    k = keys(current_dist);
-    v = values(current_dist);
+    non_zero_idx = find(P_old > 0);
     
-    for i = 1:length(k)
-        pat = k{i};
-        count = v{i};
+    for idx_i = 1:length(non_zero_idx)
+        idx = non_zero_idx(idx_i);
+        count = P_old(idx);
         prob = count / total_combs;
+        
+        v_val = idx - 1;
+        pat = rem(floor(v_val ./ pow3), 3);
         
         W = [];
         for j = 1:K
-            if (pat(j) - '0') <= 1
+            if pat(j) <= 1
                 W(end+1) = user_seq(j);
             end
         end
